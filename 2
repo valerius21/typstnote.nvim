@@ -101,7 +101,29 @@ local parse_bib_entry = function(entry)
 	}
 end
 
-M.pick_entry = function(opts)
+---@param opts typstnote.Configuration? Plugin configuration
+--- Setup function for Lazyvim
+M.setup = function(opts)
+	opts = M.init_config(opts)
+	-- user configuration
+end
+
+vim.api.nvim_create_user_command("CreateDirectories", function()
+	local config = M.init_config()
+	M.create_directories(config)
+end, {})
+
+vim.api.nvim_create_user_command("SearchBibTex", function()
+	local lines = read_file("references.bib")
+	local entries = split_bib_entries(lines)
+	local entry = parse_bib_entry(entries[8])
+	print(entry.type, entry.key, entry.fields.title)
+end, {})
+
+local lines = read_file("references.bib")
+local entries = split_bib_entries(lines)
+
+M.nasty = function(opts)
 	opts = opts or {}
 	opts.bib_path = opts.bib_path or "references.bib"
 	opts.cwd = opts.cwd or vim.uv.cwd()
@@ -139,7 +161,7 @@ M.pick_entry = function(opts)
 			previewer = conf.grep_previewer(opts),
 			sorter = sorter.get_generic_fuzzy_sorter(opts),
 			attach_mappings = function(_, map)
-				map({ "i", "n" }, "<CR>", function()
+				map({ "i", "n" }, "<CR>", function(prompt_bufnr)
 					local selection = action_state.get_selected_entry()
 
 					-- TODO: implement this
@@ -159,10 +181,10 @@ M.pick_entry = function(opts)
 						vim.cmd.bdelete()
 						vim.cmd.stopinsert()
 						local s = vim.fn.getreg('"')
-
-						local entry = parse_bib_entry(s)
-						print(entry.type, entry.key, entry.fields.title)
+						print(s)
 					end
+
+					actions.close(prompt_bufnr)
 				end, { desc = "Create a new paper note file" })
 				return true
 			end,
@@ -170,20 +192,6 @@ M.pick_entry = function(opts)
 		:find()
 end
 
----@param opts typstnote.Configuration? Plugin configuration
---- Setup function for Lazyvim
-M.setup = function(opts)
-	opts = M.init_config(opts)
-	-- user configuration
-end
-
-vim.api.nvim_create_user_command("CreateDirectories", function()
-	local config = M.init_config()
-	M.create_directories(config)
-end, {})
-
-vim.api.nvim_create_user_command("SearchBibTex", function()
-	M.pick_entry()
-end, {})
+M.nasty()
 
 return M
