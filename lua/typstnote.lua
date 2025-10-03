@@ -2,7 +2,6 @@ local pickers = require("telescope.pickers")
 local finders = require("telescope.finders")
 local make_entry = require("telescope.make_entry")
 local conf = require("telescope.config").values
-local actions = require("telescope.actions")
 local action_state = require("telescope.actions.state")
 local sorter = require("telescope.sorters")
 
@@ -14,6 +13,7 @@ local M = {}
 ---@field idea_directory string Where your notes on ideas will be stored. (default: <root>/ideas/)
 ---@field register string register to yank to. (default: 'z')
 ---@field create_gitkeep boolean If `.gitkeep` files should be generated in the directories. (default: true)
+---@field bib_path string path to your references.bib (dafault: refreences.bib)
 
 M.default_config = {
 	note_root = "research",
@@ -21,6 +21,7 @@ M.default_config = {
 	idea_directory = "ideas",
 	create_gitkeep = true,
 	register = "z",
+	bib_path = "research.bib",
 }
 
 --- Sets the paths for the creation
@@ -58,31 +59,6 @@ M.create_directories = function(config)
 	print("directories initialized")
 end
 
----Reads a text file
----@param bibtex_path string
----@return string
-local read_file = function(bibtex_path)
-	local f = io.open(bibtex_path, "r")
-	if not f then
-		error("Cannot open file")
-	end
-	local content = f:read("*a")
-	f:close()
-	return content
-end
-
---- Split BibTeX entries
---- @param content string
---- @return string[]
-local split_bib_entries = function(content)
-	local entries = {}
-	-- This pattern finds each block starting with "@" until the next "@"
-	for entry in content:gmatch("@%w+%b{}") do
-		table.insert(entries, entry)
-	end
-	return entries
-end
-
 --- Parse a single BibTeX entry into a Lua table.
 ---@param entry string A raw BibTeX entry block
 ---@return table parsed A structured table with type, key, and fields
@@ -118,7 +94,7 @@ M.pick_entry = function(opts)
 			table.insert(args, prompt)
 			table.insert(args, "-g")
 			table.insert(args, opts.bib_path)
-			return vim.tbl_flatten({
+			return vim.iter({
 				args,
 				{
 					"--color=never",
@@ -129,6 +105,8 @@ M.pick_entry = function(opts)
 					"--smart-case",
 				},
 			})
+				:flatten()
+				:totable()
 		end,
 		entry_maker = make_entry.gen_from_vimgrep(opts),
 		cwd = opts.cwd,
@@ -144,7 +122,6 @@ M.pick_entry = function(opts)
 				map({ "i", "n" }, "<CR>", function()
 					local selection = action_state.get_selected_entry()
 
-					-- TODO: implement this
 					for _, selected in ipairs(selection) do
 						local splits = vim.fn.split(selected, ":")
 						local lnum = tonumber(splits[2])
@@ -163,8 +140,8 @@ M.pick_entry = function(opts)
 						local s = vim.fn.getreg("z")
 
 						local entry = parse_bib_entry(s)
-						-- TODO: implement
-						print(entry.type, entry.key, entry.fields.title)
+
+						print(M.create_template_string(entry.key, entry.fields.title, entry.fields.abstract))
 					end
 				end, { desc = "Create a new paper note file" })
 				return true
@@ -188,5 +165,30 @@ end, {})
 vim.api.nvim_create_user_command("SearchBibTex", function()
 	M.pick_entry()
 end, {})
+
+M.create_template_string = function(cite_key, title, abstract)
+	cite_key = cite_key or "Note5GlossaryNumba"
+	title = title or "Towards Improved Modelling"
+	abstract = abstract or "#lorem(80)"
+
+	return [[
+#show: doc => conf(
+  id: "]] .. cite_key .. [[",
+  title: []] .. title .. " @" .. cite_key .. [[],
+  abstract: ]] .. abstract .. [[,
+  doc,
+)
+
+= Notes <]] .. cite_key .. [[>
+- #lorem(10)
+
+= Ideas
+- #lorem(10)
+
+#bibliography("../references.bib")
+]]
+end
+
+M.pick_entry()
 
 return M
