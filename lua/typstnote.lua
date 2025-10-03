@@ -12,6 +12,7 @@ local M = {}
 ---@field note_root string Note root directory. (default: research/)
 ---@field paper_directory string Where your notes on papers will be stored. (default: <root>/papers/)
 ---@field idea_directory string Where your notes on ideas will be stored. (default: <root>/ideas/)
+---@field register string register to yank to. (default: 'z')
 ---@field create_gitkeep boolean If `.gitkeep` files should be generated in the directories. (default: true)
 
 M.default_config = {
@@ -19,6 +20,7 @@ M.default_config = {
 	paper_directory = "papers",
 	idea_directory = "ideas",
 	create_gitkeep = true,
+	register = "z",
 }
 
 --- Sets the paths for the creation
@@ -154,13 +156,14 @@ M.pick_entry = function(opts)
 
 						vim.api.nvim_win_set_cursor(0, { lnum, 0 })
 						vim.cmd.normal("zz")
-						vim.cmd.normal("vapy")
+						vim.cmd.normal('vap"' .. M.default_config.register .. "y")
 
 						vim.cmd.bdelete()
 						vim.cmd.stopinsert()
-						local s = vim.fn.getreg('"')
+						local s = vim.fn.getreg("z")
 
 						local entry = parse_bib_entry(s)
+						-- TODO: implement
 						print(entry.type, entry.key, entry.fields.title)
 					end
 				end, { desc = "Create a new paper note file" })
