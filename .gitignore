@@ -42,3 +42,4 @@ luac.out
 # project specific
 research/
 research/{ideas,papers}
+references.bib

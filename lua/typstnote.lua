@@ -1,3 +1,11 @@
+local pickers = require("telescope.pickers")
+local finders = require("telescope.finders")
+local make_entry = require("telescope.make_entry")
+local conf = require("telescope.config").values
+local actions = require("telescope.actions")
+local action_state = require("telescope.actions.state")
+local sorter = require("telescope.sorters")
+
 local M = {}
 
 ---@class typstnote.Configuration
@@ -48,6 +56,51 @@ M.create_directories = function(config)
 	print("directories initialized")
 end
 
+---Reads a text file
+---@param bibtex_path string
+---@return string
+local read_file = function(bibtex_path)
+	local f = io.open(bibtex_path, "r")
+	if not f then
+		error("Cannot open file")
+	end
+	local content = f:read("*a")
+	f:close()
+	return content
+end
+
+--- Split BibTeX entries
+--- @param content string
+--- @return string[]
+local split_bib_entries = function(content)
+	local entries = {}
+	-- This pattern finds each block starting with "@" until the next "@"
+	for entry in content:gmatch("@%w+%b{}") do
+		table.insert(entries, entry)
+	end
+	return entries
+end
+
+--- Parse a single BibTeX entry into a Lua table.
+---@param entry string A raw BibTeX entry block
+---@return table parsed A structured table with type, key, and fields
+local parse_bib_entry = function(entry)
+	local entry_type, key = entry:match("@(%w+){(.-),")
+	local fields = {}
+
+	for field, value in entry:gmatch('([%w]+)%s*=%s*[{"](.-)[}"],') do
+		-- Remove any curly braces left inside values
+		value = value:gsub("[{}]", "")
+		fields[field] = value
+	end
+
+	return {
+		type = entry_type,
+		key = key,
+		fields = fields,
+	}
+end
+
 ---@param opts typstnote.Configuration? Plugin configuration
 --- Setup function for Lazyvim
 M.setup = function(opts)
@@ -60,4 +113,67 @@ vim.api.nvim_create_user_command("CreateDirectories", function()
 	M.create_directories(config)
 end, {})
 
+vim.api.nvim_create_user_command("SearchBibTex", function()
+	local lines = read_file("references.bib")
+	local entries = split_bib_entries(lines)
+	local entry = parse_bib_entry(entries[8])
+	print(entry.type, entry.key, entry.fields.title)
+end, {})
+
+local lines = read_file("references.bib")
+local entries = split_bib_entries(lines)
+local entry = parse_bib_entry(entries[8])
+M.nasty = function(opts)
+	opts = opts or {}
+	opts.bib_path = opts.bib_path or "references.bib"
+	opts.cwd = opts.cwd or vim.uv.cwd()
+
+	local finder = finders.new_async_job({
+		command_generator = function(prompt)
+			if not prompt or prompt == "" then
+				prompt = "@"
+			end
+			local args = { "rg" }
+			table.insert(args, "-e")
+			table.insert(args, prompt)
+			table.insert(args, "-g")
+			table.insert(args, opts.bib_path)
+			return vim.tbl_flatten({
+				args,
+				{
+					"--color=never",
+					"--no-heading",
+					"--with-filename",
+					"--line-number",
+					"--column",
+					"--smart-case",
+				},
+			})
+		end,
+		entry_maker = make_entry.gen_from_vimgrep(opts),
+		cwd = opts.cwd,
+	})
+
+	pickers
+		.new(opts, {
+			prompt_title = "BibTex Search",
+			finder = finder,
+			previewer = conf.grep_previewer(opts),
+			sorter = sorter.get_generic_fuzzy_sorter(opts),
+			attach_mappings = function(_, map)
+				map({ "i", "n" }, "<CR>", function(prompt_bufnr)
+					local selection = action_state.get_selected_entry()
+
+					-- TODO: implement this
+					print(selection[1])
+
+					actions.close(prompt_bufnr)
+				end, { desc = "Create a new paper note file" })
+				return true
+			end,
+		})
+		:find()
+end
+
+M.nasty()
 return M
