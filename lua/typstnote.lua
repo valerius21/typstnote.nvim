@@ -141,7 +141,7 @@ M.pick_entry = function(opts)
 
 						local entry = parse_bib_entry(s)
 
-						print(M.create_template_string(entry.key, entry.fields.title, entry.fields.abstract))
+						M.add_paper_note(entry)
 					end
 				end, { desc = "Create a new paper note file" })
 				return true
@@ -166,12 +166,24 @@ vim.api.nvim_create_user_command("SearchBibTex", function()
 	M.pick_entry()
 end, {})
 
-M.create_template_string = function(cite_key, title, abstract)
+M.create_template_string = function(cite_key, title, abstract, include_bib)
 	cite_key = cite_key or "Note5GlossaryNumba"
 	title = title or "Towards Improved Modelling"
-	abstract = abstract or "#lorem(80)"
+	if abstract then
+		abstract = "[" .. abstract .. "]"
+	else
+		abstract = "lorem(80)"
+	end
+	local bib_str
+	if include_bib == nil or include_bib then
+		bib_str = '#bibliography("../../references.bib")'
+	else
+		bib_str = ""
+	end
 
 	return [[
+#import "_paper.typ": conf
+
 #show: doc => conf(
   id: "]] .. cite_key .. [[",
   title: []] .. title .. " @" .. cite_key .. [[],
@@ -179,16 +191,55 @@ M.create_template_string = function(cite_key, title, abstract)
   doc,
 )
 
-= Notes <]] .. cite_key .. [[>
+= Notes <notes_]] .. M.remove_at_symbol(cite_key) .. [[>
 - #lorem(10)
 
-= Ideas
+= Ideas <ideas_]] .. M.remove_at_symbol(cite_key) .. [[>
 - #lorem(10)
 
-#bibliography("../references.bib")
-]]
+]] .. bib_str
 end
 
+M.remove_at_symbol = function(str)
+	return str:gsub("@", "")
+end
+
+--- Create a new paper note file based on a BibTeX entry
+--- @param entry table A parsed BibTeX entry with fields `key`, `title`, and `abstract`
+M.add_paper_note = function(entry)
+	-- check if papers directory exists
+
+	if vim.fn.isdirectory(M.default_config.paper_directory) == 0 then
+		print("Papers directory does not exist. Creating directories...")
+		M.create_directories(M.default_config)
+	end
+
+	-- copy _paper.typ to papers directory if it doesn't exist
+	local paper_typ_path = M.default_config.paper_directory .. "/_paper.typ"
+	if vim.fn.filereadable(paper_typ_path) == 0 then
+		local source_path = vim.fn.stdpath("config") .. "/_paper.typ"
+		if vim.fn.filereadable(source_path) == 1 then
+			os.execute("cp " .. source_path .. " " .. paper_typ_path)
+			print("_paper.typ copied to papers directory.")
+		else
+			print("Source _paper.typ not found in config/typst/. Please create it manually.")
+		end
+	end
+
+	-- write the created template in a file named after the cite key in the papers directory
+	local file_path = M.default_config.paper_directory .. "/" .. entry.key .. ".typ"
+	local file = io.open(file_path, "w")
+	if file then
+		local content = M.create_template_string(entry.key, entry.fields.title, entry.fields.abstract)
+		file:write(content)
+		file:close()
+		print("Paper note created at " .. file_path)
+	else
+		print("Error creating file at " .. file_path)
+	end
+end
+
+M.init_config()
 M.pick_entry()
 
 return M
