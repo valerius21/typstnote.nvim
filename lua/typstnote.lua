@@ -48,7 +48,12 @@ M.create_directories = function(config)
 	}
 
 	for _, dir in ipairs(directories) do
-		local path = vim.fs.root(0, ".git") .. "/" .. dir
+		local git_root = vim.fs.root(0, ".git")
+		if not git_root then
+			error("Not in a git repository", vim.log.levels.ERROR)
+			return
+		end
+		local path = git_root .. "/" .. dir
 
 		os.execute("mkdir -p " .. path)
 		print(path)
