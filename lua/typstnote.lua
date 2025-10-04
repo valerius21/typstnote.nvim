@@ -15,7 +15,7 @@ local M = {}
 ---@field create_gitkeep boolean If `.gitkeep` files should be generated in the directories. (default: true)
 ---@field bib_path string path to your references.bib (dafault: refreences.bib)
 
-M.default_config = {
+M.config = {
 	note_root = "research",
 	paper_directory = "papers",
 	idea_directory = "ideas",
@@ -28,7 +28,7 @@ M.default_config = {
 ---@param config typstnote.Configuration?
 ---@return typstnote.Configuration
 M.init_config = function(config)
-	config = config or M.default_config
+	config = config or M.config
 	config.paper_directory = config.note_root .. "/" .. config.paper_directory
 	config.idea_directory = config.note_root .. "/" .. config.idea_directory
 	config.create_gitkeep = true
@@ -133,7 +133,7 @@ M.pick_entry = function(opts)
 
 						vim.api.nvim_win_set_cursor(0, { lnum, 0 })
 						vim.cmd.normal("zz")
-						vim.cmd.normal('vap"' .. M.default_config.register .. "y")
+						vim.cmd.normal('vap"' .. M.config.register .. "y")
 
 						vim.cmd.bdelete()
 						vim.cmd.stopinsert()
@@ -160,7 +160,7 @@ M.create_template_string = function(cite_key, title, abstract, include_bib)
 	end
 	local bib_str
 	if include_bib == nil or include_bib then
-		bib_str = '#bibliography("../../references.bib")'
+		bib_str = '#bibliography("../../references.bib")' -- TODO: robust path
 	else
 		bib_str = ""
 	end
@@ -193,15 +193,15 @@ end
 M.add_paper_note = function(entry)
 	-- check if papers directory exists
 
-	if vim.fn.isdirectory(M.default_config.paper_directory) == 0 then
+	if vim.fn.isdirectory(M.config.paper_directory) == 0 then
 		print("Papers directory does not exist. Creating directories...")
-		M.create_directories(M.default_config)
+		M.create_directories(M.config)
 	end
 
 	-- copy _paper.typ to papers directory if it doesn't exist
-	local paper_typ_path = M.default_config.paper_directory .. "/_paper.typ"
+	local paper_typ_path = M.config.paper_directory .. "/_paper.typ"
 	if vim.fn.filereadable(paper_typ_path) == 0 then
-		local source_path = vim.fn.stdpath("config") .. "/_paper.typ"
+		local source_path = vim.fn.expand("%:p:h") .. "/../typst/_paper.typ"
 		if vim.fn.filereadable(source_path) == 1 then
 			os.execute("cp " .. source_path .. " " .. paper_typ_path)
 			print("_paper.typ copied to papers directory.")
@@ -211,7 +211,7 @@ M.add_paper_note = function(entry)
 	end
 
 	-- write the created template in a file named after the cite key in the papers directory
-	local file_path = M.default_config.paper_directory .. "/" .. entry.key .. ".typ"
+	local file_path = M.config.paper_directory .. "/" .. entry.key .. ".typ"
 	local file = io.open(file_path, "w")
 	if file then
 		local content = M.create_template_string(entry.key, entry.fields.title, entry.fields.abstract)
@@ -227,19 +227,6 @@ end
 --- Setup function for Lazyvim
 M.setup = function(opts)
 	opts = M.init_config(opts)
-
-	vim.api.nvim_create_user_command("TypstNote", function(cmd_opts)
-		local sub = cmd_opts.fargs[1]
-		if sub == "init" then
-			M.create_directories(M.default_config)
-		else
-			if sub == "add" then
-				M.pick_entry()
-			else
-				print("Unknown subcommand: " .. sub)
-			end
-		end
-	end, { nargs = 1 })
 end
 
 return M
