@@ -28,7 +28,9 @@ M.config = {
 ---@param config typstnote.Configuration?
 ---@return typstnote.Configuration
 M.init_config = function(config)
-	config = config or M.config
+	if config == nil then
+		config = M.config
+	end
 	config.paper_directory = config.note_root .. "/" .. config.paper_directory
 	config.idea_directory = config.note_root .. "/" .. config.idea_directory
 	config.create_gitkeep = true
