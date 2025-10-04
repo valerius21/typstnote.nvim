@@ -48,8 +48,8 @@ M.create_directories = function(config)
 	}
 
 	for _, dir in ipairs(directories) do
-		local git_root = vim.fs.root(0, ".git")
-		if not git_root then
+		local git_root = vim.fn.systemlist("git rev-parse --show-toplevel")[1]
+		if vim.v.shell_error ~= 0 or not git_root or git_root == "" then
 			error("Not in a git repository", vim.log.levels.ERROR)
 			return
 		end
