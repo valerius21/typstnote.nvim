@@ -150,25 +150,9 @@ M.pick_entry = function(opts)
 		:find()
 end
 
----@param opts typstnote.Configuration? Plugin configuration
---- Setup function for Lazyvim
-M.setup = function(opts)
-	opts = M.init_config(opts)
-	-- user configuration
-end
-
-vim.api.nvim_create_user_command("CreateDirectories", function()
-	local config = M.init_config()
-	M.create_directories(config)
-end, {})
-
-vim.api.nvim_create_user_command("SearchBibTex", function()
-	M.pick_entry()
-end, {})
-
 M.create_template_string = function(cite_key, title, abstract, include_bib)
-	cite_key = cite_key or "Note5GlossaryNumba"
-	title = title or "Towards Improved Modelling"
+	cite_key = cite_key or "no_cite_key"
+	title = title or "No Title"
 	if abstract then
 		abstract = "[" .. abstract .. "]"
 	else
@@ -222,7 +206,7 @@ M.add_paper_note = function(entry)
 			os.execute("cp " .. source_path .. " " .. paper_typ_path)
 			print("_paper.typ copied to papers directory.")
 		else
-			print("Source _paper.typ not found in config/typst/. Please create it manually.")
+			error("Source _paper.typ not found in config/typst/. Please create it manually.", vim.log.levels.ERROR)
 		end
 	end
 
@@ -235,11 +219,27 @@ M.add_paper_note = function(entry)
 		file:close()
 		print("Paper note created at " .. file_path)
 	else
-		print("Error creating file at " .. file_path)
+		error("Error creating file at " .. file_path, vim.log.levels.ERROR)
 	end
 end
 
-M.init_config()
-M.pick_entry()
+---@param opts typstnote.Configuration? Plugin configuration
+--- Setup function for Lazyvim
+M.setup = function(opts)
+	opts = M.init_config(opts)
+
+	vim.api.nvim_create_user_command("TypstNote", function(cmd_opts)
+		local sub = cmd_opts.fargs[1]
+		if sub == "init" then
+			M.create_directories(M.default_config)
+		else
+			if sub == "add" then
+				M.pick_entry()
+			else
+				print("Unknown subcommand: " .. sub)
+			end
+		end
+	end, { nargs = 1 })
+end
 
 return M
